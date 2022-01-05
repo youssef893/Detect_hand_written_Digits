@@ -1,29 +1,24 @@
 import cv2
 import numpy as np
-url = "http://192.168.1.3:8080/video"
-cap = cv2.VideoCapture(0)
-
 from keras.models import load_model
 
 model = load_model('cnn.h5')
 
 
 def predict_digit(img):
+
     # resize image to 28x28 pixels
     img = cv2.resize(img, (28, 28))
-    #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # reshaping to support our model input and normalizing
     img = img.reshape(1, 28, 28, 1)
     # predicting the class
     res = model.predict([img])
-
     return np.argmax(res, axis=1), np.max(res)
 
 
-while True:
-    success, img = cap.read()
-    if not success:
-        break
+def captch_ex(file_name):
+    img = cv2.imread(file_name)
+
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img_gray_blur = cv2.GaussianBlur(img_gray, (5, 5), 0)
 
@@ -35,7 +30,8 @@ while True:
 
     contours, hierarchy = cv2.findContours(dilated, cv2.RETR_EXTERNAL,
                                            cv2.CHAIN_APPROX_NONE)  # findContours returns 3 variables for getting contours
-
+    
+    l = []
     for contour in contours:
         # get rectangle bounding contour
         [x, y, w, h] = cv2.boundingRect(contour)
@@ -45,14 +41,21 @@ while True:
 
         # draw rectangle around contour on original image
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 255), 2)
-        num = mask[y:y + h, x:x + w]
+        num = mask[y:y+h, x:x+w]
 
         text, prob = predict_digit(num)
-        print(f'{text}, {prob * 100}%')
-        cv2.putText(img, f'{text[0]},{round(prob, 0) * 100}%', (x, y - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2, cv2.LINE_AA)
+        print(f'text is {text[0]}, acc={prob * 100}%')
+        l.append(prob * 100)
+        cv2.putText(img, f'text is {text[0]}', (x + w - 90, y + h + 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2, cv2.LINE_AA)
+    mean = np.mean(l)
+    cv2.putText(img, f'acc={mean}%', (50, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2, cv2.LINE_AA)
+    # write original image with added contours to disk
+    cv2.imwrite('teset.png', img)
+    cv2.imshow('captcha_result', img)
+    cv2.waitKey()
 
-    cv2.imshow('image', img)
 
-    if cv2.waitKey(1) == 13:
-        break
+file_name = 'Screenshot (13).png'
+captch_ex(file_name)
